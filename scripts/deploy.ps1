@@ -22,10 +22,15 @@ if ($gitStatus) {
 Write-Host "Pushing latest commits to GitHub origin/main..." -ForegroundColor Cyan
 git push origin main 2>$null
 
+function Invoke-RemoteScriptBlock ([string]$scriptText) {
+    $bytes = [System.Text.Encoding]::Unicode.GetBytes($scriptText)
+    $encoded = [Convert]::ToBase64String($bytes)
+    ssh $TargetHost "powershell.exe -NoProfile -NonInteractive -EncodedCommand $encoded"
+}
+
 # Step 2: Sync or pull repo on Mini PC
 Write-Host "`n[STEP 2] Updating repository on Mini PC..." -ForegroundColor Cyan
-$updateCommand = @"
-powershell -NoProfile -Command "
+$updateScript = @"
 if (Test-Path '$RemotePath') {
     Set-Location '$RemotePath'
     git pull origin main
@@ -33,10 +38,9 @@ if (Test-Path '$RemotePath') {
     git clone https://github.com/Netke237/ulanzi.git '$RemotePath'
     Set-Location '$RemotePath'
 }
-"
 "@
 
-ssh $TargetHost $updateCommand
+Invoke-RemoteScriptBlock -scriptText $updateScript
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Failed to update repository on $TargetHost."
     exit $LASTEXITCODE
@@ -44,14 +48,12 @@ if ($LASTEXITCODE -ne 0) {
 
 # Step 3: Spin up Docker Compose stack on Mini PC
 Write-Host "`n[STEP 3] Starting Docker Compose stack on Mini PC..." -ForegroundColor Cyan
-$composeCommand = @"
-powershell -NoProfile -Command "
+$composeScript = @"
 Set-Location '$RemotePath'
 docker compose up -d
-"
 "@
 
-ssh $TargetHost $composeCommand
+Invoke-RemoteScriptBlock -scriptText $composeScript
 if ($LASTEXITCODE -ne 0) {
     Write-Error "docker compose up failed on $TargetHost."
     exit $LASTEXITCODE
