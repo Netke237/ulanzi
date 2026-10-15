@@ -1,0 +1,26 @@
+# Environment & secrets
+.env
+*.local
+secrets.yaml
+
+# Home Assistant state & DB
+homeassistant/.storage/
+homeassistant/home-assistant_v2.db*
+homeassistant/home-assistant.log*
+homeassistant/tts/
+homeassistant/.HA_RESTORE*
+
+# Mosquitto data & logs
+mosquitto/data/
+mosquitto/log/
+
+# OS & Editor
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.bak

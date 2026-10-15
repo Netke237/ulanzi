@@ -1,0 +1,37 @@
+version: "3.8"
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: ulanzi-mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 2 bash -c '</dev/tcp/localhost/1883' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: ulanzi-homeassistant
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    environment:
+      - TZ=${TZ:-Europe/Berlin}
+    ports:
+      - "8123:8123"
+    volumes:
+      - ./homeassistant:/config
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8123"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
