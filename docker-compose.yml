@@ -12,11 +12,6 @@ services:
       - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - ./mosquitto/data:/mosquitto/data
       - ./mosquitto/log:/mosquitto/log
-    healthcheck:
-      test: ["CMD-SHELL", "timeout 2 bash -c '</dev/tcp/localhost/1883' || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   homeassistant:
     image: ghcr.io/home-assistant/home-assistant:stable

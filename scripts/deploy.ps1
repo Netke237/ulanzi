@@ -60,7 +60,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # Step 4: Verify Mosquitto MQTT Broker (port 1883)
-Write-Host "`n[STEP 4] Verifying Mosquitto Broker ($TargetIp:1883)..." -ForegroundColor Cyan
+Write-Host "`n[STEP 4] Verifying Mosquitto Broker ($($TargetIp):1883)..." -ForegroundColor Cyan
 $maxRetries = 15
 $mqttOk = $false
 for ($i = 1; $i -le $maxRetries; $i++) {
@@ -77,27 +77,24 @@ if (-not $mqttOk) {
 }
 
 # Step 5: Verify Home Assistant HTTP interface (port 8123)
-Write-Host "`n[STEP 5] Verifying Home Assistant (http://$TargetIp:8123)..." -ForegroundColor Cyan
+Write-Host "`n[STEP 5] Verifying Home Assistant (http://$($TargetIp):8123)..." -ForegroundColor Cyan
 $haOk = $false
 $maxHaRetries = 25
 for ($i = 1; $i -le $maxHaRetries; $i++) {
-    try {
-        $resp = Invoke-WebRequest -Uri "http://${TargetIp}:8123" -TimeoutSec 4 -ErrorAction Stop
-        if ($resp.StatusCode -eq 200 -or $resp.StatusCode -eq 302) {
-            $haOk = $true
-            Write-Host "[OK] Home Assistant is reachable on HTTP 8123 (status $($resp.StatusCode))." -ForegroundColor Green
-            break
-        }
-    } catch {
-        Start-Sleep -Seconds 2
+    $tcp = Test-NetConnection -ComputerName $TargetIp -Port 8123 -WarningAction SilentlyContinue
+    if ($tcp.TcpTestSucceeded) {
+        $haOk = $true
+        Write-Host "[OK] Home Assistant is reachable and accepting connections on port 8123." -ForegroundColor Green
+        break
     }
+    Start-Sleep -Seconds 2
 }
 if (-not $haOk) {
     Write-Warning "Home Assistant initial response timed out. Initial container startup can take up to 60 seconds on first run."
 }
 
 Write-Host "`n==========================================================" -ForegroundColor Green
-Write-Host "Deployment Completed!" -ForegroundColor Green
-Write-Host "Home Assistant: http://${TargetIp}:8123" -ForegroundColor Green
-Write-Host "Mosquitto MQTT: ${TargetIp}:1883" -ForegroundColor Green
+Write-Host "Deployment Completed Successfully!" -ForegroundColor Green
+Write-Host "Home Assistant Web UI: http://$($TargetIp):8123" -ForegroundColor Green
+Write-Host "Mosquitto MQTT Broker: $($TargetIp):1883" -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Green
