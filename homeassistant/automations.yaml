@@ -1,11 +1,11 @@
-# Home Assistant Automations for Ulanzi TC001 (AWTRIX NG) & Home Connect Appliances
+# Home Assistant Automations for Ulanzi TC001 (AWTRIX NG v1 API) & Home Connect Appliances
 
 # ==============================================================================
 # 1. WASHING MACHINE: Dynamic Phase & Progress Rotation App
 # ==============================================================================
 - id: washing_machine_active_progress
   alias: "Waschmaschine: Live-Fortschritt & Phase auf Ulanzi"
-  description: "Aktualisiert das AWTRIX Display während des Waschgangs mit Phasen-Icons (Waschen, Spülen, Schleudern)"
+  description: "Aktualisiert das AWTRIX NG Display während des Waschgangs mit Phasen-Icons (Waschen, Spülen, Schleudern)"
   trigger:
     - platform: state
       entity_id: sensor.washing_machine_program_progress
@@ -36,13 +36,13 @@
           {% endif %}
     - service: mqtt.publish
       data:
-        topic: "awtrix/custom/washer"
+        topic: "awtrix/cmd/apps/pushed/washer"
         payload: >-
           {
             "text": "{{ phase_text }}",
             "icon": "{{ phase_icon }}",
-            "color": [100, 200, 255],
-            "lifetime": 3600
+            "textColor": "#64C8FF",
+            "lifetimeMs": 3600000
           }
 
 # ==============================================================================
@@ -71,36 +71,38 @@
           sequence:
             - service: mqtt.publish
               data:
-                topic: "awtrix/notify"
+                topic: "awtrix/cmd/notify"
                 payload: >-
                   {
                     "text": "WÄSCHE FERTIG",
                     "icon": "waschmaschine_fertig",
-                    "duration": 15,
-                    "color": [0, 255, 128],
-                    "rtttl": "two_short:d=4,o=5,b=100:16e6,16e6"
+                    "textColor": "#00FF80",
+                    "durationMs": 15000,
+                    "sound": {
+                      "rtttl": "bell:d=4,o=5,b=100:e,c"
+                    }
                   }
       default:
         - service: mqtt.publish
           data:
-            topic: "awtrix/notify"
+            topic: "awtrix/cmd/notify"
             payload: >-
               {
                 "text": "WÄSCHE FERTIG",
                 "icon": "waschmaschine_fertig",
-                "duration": 15,
-                "color": [0, 255, 128]
+                "textColor": "#00FF80",
+                "durationMs": 15000
               }
     # 2b. Persistenter Erinnerungs-Bildschirm im Rotationszyklus (bis Tür geöffnet wird oder max 6 Std.)
     - service: mqtt.publish
       data:
-        topic: "awtrix/custom/washer"
+        topic: "awtrix/cmd/apps/pushed/washer"
         payload: >-
           {
             "text": "WÄSCHE FERTIG",
             "icon": "waschmaschine_fertig",
-            "color": [0, 255, 128],
-            "lifetime": 21600
+            "textColor": "#00FF80",
+            "lifetimeMs": 21600000
           }
 
 # ==============================================================================
@@ -108,7 +110,7 @@
 # ==============================================================================
 - id: washing_machine_dismiss_reminder
   alias: "Waschmaschine: Erinnerung löschen bei Türöffnung oder Taste"
-  description: "Löscht den Waschmaschinen-Bildschirm wenn Tür geöffnet, Taste gedrückt oder Maschine entleert"
+  description: "Löscht den Waschmaschinen-Bildschirm wenn Tür geöffnet oder Select-Taste gedrückt"
   trigger:
     - platform: state
       entity_id: binary_sensor.washing_machine_door
@@ -119,7 +121,7 @@
   action:
     - service: mqtt.publish
       data:
-        topic: "awtrix/custom/washer"
+        topic: "awtrix/cmd/apps/pushed/washer"
         payload: "{}"
 
 # ==============================================================================
@@ -142,13 +144,13 @@
         pct: "{{ trigger.to_state.state | int(0) }}"
     - service: mqtt.publish
       data:
-        topic: "awtrix/custom/dryer"
+        topic: "awtrix/cmd/apps/pushed/dryer"
         payload: >-
           {
             "text": "TROCKNET {{ pct }}%",
             "icon": "2062",
-            "color": [255, 180, 0],
-            "lifetime": 3600
+            "textColor": "#FFA500",
+            "lifetimeMs": 3600000
           }
 
 # ==============================================================================
@@ -179,35 +181,37 @@
           sequence:
             - service: mqtt.publish
               data:
-                topic: "awtrix/notify"
+                topic: "awtrix/cmd/notify"
                 payload: >-
                   {
                     "text": "TROCKNER FERTIG",
                     "icon": "2062",
-                    "duration": 15,
-                    "color": [255, 180, 0],
-                    "rtttl": "two_short:d=4,o=5,b=100:16e6,16e6"
+                    "textColor": "#FFA500",
+                    "durationMs": 15000,
+                    "sound": {
+                      "rtttl": "bell:d=4,o=5,b=100:e,c"
+                    }
                   }
       default:
         - service: mqtt.publish
           data:
-            topic: "awtrix/notify"
+            topic: "awtrix/cmd/notify"
             payload: >-
               {
                 "text": "TROCKNER FERTIG",
                 "icon": "2062",
-                "duration": 15,
-                "color": [255, 180, 0]
+                "textColor": "#FFA500",
+                "durationMs": 15000
               }
     - service: mqtt.publish
       data:
-        topic: "awtrix/custom/dryer"
+        topic: "awtrix/cmd/apps/pushed/dryer"
         payload: >-
           {
             "text": "TROCKNER FERTIG",
             "icon": "2062",
-            "color": [255, 180, 0],
-            "lifetime": 21600
+            "textColor": "#FFA500",
+            "lifetimeMs": 21600000
           }
 
 # ==============================================================================
@@ -226,7 +230,7 @@
   action:
     - service: mqtt.publish
       data:
-        topic: "awtrix/custom/dryer"
+        topic: "awtrix/cmd/apps/pushed/dryer"
         payload: "{}"
 
 # ==============================================================================
@@ -245,11 +249,11 @@
   action:
     - service: mqtt.publish
       data:
-        topic: "awtrix/notify"
+        topic: "awtrix/cmd/notify"
         payload: >-
           {
             "text": "i-DOS LEER",
             "icon": "638",
-            "duration": 10,
-            "color": [255, 80, 0]
+            "textColor": "#FF3B30",
+            "durationMs": 10000
           }

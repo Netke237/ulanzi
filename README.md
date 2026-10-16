@@ -103,6 +103,31 @@ The screen immediately enters the rotation cycle on your Ulanzi TC001!
 
 ---
 
+## 5. Local Weather Forecast & Icon Provisioning (DWD & AWTRIX)
+
+As defined in [ADR 0005](docs/adr/0005-local-weather-forecast-and-icons.md), local weather forecasting is powered by **Deutscher Wetterdienst (DWD)** and native AWTRIX custom apps:
+
+### 1. Upload Weather Icons to Clock
+The repository includes a curated set of 8×8 animated pixel-art GIF icons (`sun.gif`, `cloud.gif`, `rain.gif`, `storm.gif`, `wind.gif`, `snow.gif`, `fog.gif`) in `assets/icons/weather/`.
+
+Upload them directly to the Ulanzi TC001 flash storage (`/ICONS/`):
+```powershell
+python scripts/upload_weather_icons.py --ip 192.168.55.xxx
+```
+*(Or specify `AWTRIX_IP` in `.env` to run `python scripts/upload_weather_icons.py` without arguments).*
+
+### 2. Add DWD Weather in Home Assistant
+1. In Home Assistant, go to **Settings** -> **Devices & Services** -> **Add Integration**.
+2. Search for **DWD Weather** (or **Deutscher Wetterdienst (DWD) Weather Warnings**).
+3. The integration will automatically pick up your home coordinates from `zone.home`.
+
+### 3. Display Behavior & Severe Storm Warnings
+- **App 1 (`weather_now`)**: Displays current condition icon + temperature (e.g. `[☀️] 19°C`).
+- **App 2 (`weather_forecast`)**: Displays daily High/Low (e.g. `[⛅] 23° 14°`), dynamically switching to live wind speed (`[💨] 35 km/h`) whenever wind exceeds 30 km/h.
+- **Urgent Unwetter/Gale Popup Alert (`awtrix/notify`)**: Triggers an immediate flashing popup with storm/wind icon and chime when DWD Warning Level 2 (Orange) or wind gusts > 60 km/h occur (audio chime muted 22:00–08:00).
+
+---
+
 ## Repository Structure
 
 ```
@@ -110,12 +135,21 @@ The screen immediately enters the rotation cycle on your Ulanzi TC001!
 ├── AGENTS.md                   # Shared agent rules
 ├── GLOSSARY.md                 # Project vocabulary & hardware terms
 ├── docker-compose.yml          # Production Docker Compose for Mini PC
+├── assets/
+│   └── icons/
+│       └── weather/            # 8x8 animated pixel-art weather GIFs
+├── homeassistant/
+│   ├── configuration.yaml      # Home Assistant core configuration
+│   └── automations.yaml        # Appliance, weather, and alert automations
 ├── mosquitto/
 │   └── config/
 │       └── mosquitto.conf      # Local MQTT broker configuration
 ├── docs/
-│   ├── adr/                    # Architecture Decision Records (ADRs)
+│   ├── adr/                    # Architecture Decision Records (0001–0005)
 │   └── agents/                 # Agent specifications (issue tracker, domain rules)
 └── scripts/
-    └── deploy.ps1              # Deployment and verification script for Mini PC
+    ├── deploy.ps1              # Deployment and verification script for Mini PC
+    ├── download_weather_icons.py # Fetcher for curated 8x8 weather GIFs
+    └── upload_weather_icons.py   # Uploader to Ulanzi flash filesystem
 ```
+
