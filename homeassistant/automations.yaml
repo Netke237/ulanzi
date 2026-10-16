@@ -1,0 +1,255 @@
+# Home Assistant Automations for Ulanzi TC001 (AWTRIX NG) & Home Connect Appliances
+
+# ==============================================================================
+# 1. WASHING MACHINE: Dynamic Phase & Progress Rotation App
+# ==============================================================================
+- id: washing_machine_active_progress
+  alias: "Waschmaschine: Live-Fortschritt & Phase auf Ulanzi"
+  description: "Aktualisiert das AWTRIX Display während des Waschgangs mit Phasen-Icons (Waschen, Spülen, Schleudern)"
+  trigger:
+    - platform: state
+      entity_id: sensor.washing_machine_program_progress
+  condition:
+    - condition: template
+      value_template: >-
+        {{ trigger.to_state.state not in ['unknown', 'unavailable', 'None', ''] 
+           and trigger.to_state.state | int(0) > 0 
+           and trigger.to_state.state | int(0) < 100 }}
+  action:
+    - variables:
+        pct: "{{ trigger.to_state.state | int(0) }}"
+        phase_icon: >-
+          {% if pct < 70 %}
+            waschmaschine_waschen
+          {% elif pct < 90 %}
+            waschmaschine_spuehlen
+          {% else %}
+            waschmaschine_schleudern
+          {% endif %}
+        phase_text: >-
+          {% if pct < 70 %}
+            WÄSCHT {{ pct }}%
+          {% elif pct < 90 %}
+            SPÜLT {{ pct }}%
+          {% else %}
+            SCHLEUDERT {{ pct }}%
+          {% endif %}
+    - service: mqtt.publish
+      data:
+        topic: "awtrix/custom/washer"
+        payload: >-
+          {
+            "text": "{{ phase_text }}",
+            "icon": "{{ phase_icon }}",
+            "color": [100, 200, 255],
+            "lifetime": 3600
+          }
+
+# ==============================================================================
+# 2. WASHING MACHINE: Finished Alert & Persistent Reminder
+# ==============================================================================
+- id: washing_machine_finished_notification
+  alias: "Waschmaschine: Fertig Benachrichtigung & Erinnerung"
+  description: "Sofortige Pop-up Meldung mit Chime und persistente Bildschirmschleife wenn Wäsche fertig ist"
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.washing_machine_program_progress
+      above: 99
+    - platform: state
+      entity_id: sensor.washing_machine_program_finished
+      to: "present"
+    - platform: state
+      entity_id: sensor.washing_machine_operation_state
+      to: "finished"
+  action:
+    # 2a. Sofortige Pop-up Benachrichtigung (mit Audio-Chime tagsüber)
+    - choose:
+        - conditions:
+            - condition: time
+              after: "08:00:00"
+              before: "22:00:00"
+          sequence:
+            - service: mqtt.publish
+              data:
+                topic: "awtrix/notify"
+                payload: >-
+                  {
+                    "text": "WÄSCHE FERTIG",
+                    "icon": "waschmaschine_fertig",
+                    "duration": 15,
+                    "color": [0, 255, 128],
+                    "rtttl": "two_short:d=4,o=5,b=100:16e6,16e6"
+                  }
+      default:
+        - service: mqtt.publish
+          data:
+            topic: "awtrix/notify"
+            payload: >-
+              {
+                "text": "WÄSCHE FERTIG",
+                "icon": "waschmaschine_fertig",
+                "duration": 15,
+                "color": [0, 255, 128]
+              }
+    # 2b. Persistenter Erinnerungs-Bildschirm im Rotationszyklus (bis Tür geöffnet wird oder max 6 Std.)
+    - service: mqtt.publish
+      data:
+        topic: "awtrix/custom/washer"
+        payload: >-
+          {
+            "text": "WÄSCHE FERTIG",
+            "icon": "waschmaschine_fertig",
+            "color": [0, 255, 128],
+            "lifetime": 21600
+          }
+
+# ==============================================================================
+# 3. WASHING MACHINE: Dismiss / Clear Screen
+# ==============================================================================
+- id: washing_machine_dismiss_reminder
+  alias: "Waschmaschine: Erinnerung löschen bei Türöffnung oder Taste"
+  description: "Löscht den Waschmaschinen-Bildschirm wenn Tür geöffnet, Taste gedrückt oder Maschine entleert"
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.washing_machine_door
+      to: "on"
+    - platform: state
+      entity_id: binary_sensor.awtrix_ng_button_select
+      to: "on"
+  action:
+    - service: mqtt.publish
+      data:
+        topic: "awtrix/custom/washer"
+        payload: "{}"
+
+# ==============================================================================
+# 4. DRYER: Dynamic Progress Rotation App
+# ==============================================================================
+- id: dryer_active_progress
+  alias: "Trockner: Live-Fortschritt auf Ulanzi"
+  description: "Zeigt Fortschritt während des Trocknens an"
+  trigger:
+    - platform: state
+      entity_id: sensor.dryer_program_progress
+  condition:
+    - condition: template
+      value_template: >-
+        {{ trigger.to_state.state not in ['unknown', 'unavailable', 'None', ''] 
+           and trigger.to_state.state | int(0) > 0 
+           and trigger.to_state.state | int(0) < 100 }}
+  action:
+    - variables:
+        pct: "{{ trigger.to_state.state | int(0) }}"
+    - service: mqtt.publish
+      data:
+        topic: "awtrix/custom/dryer"
+        payload: >-
+          {
+            "text": "TROCKNET {{ pct }}%",
+            "icon": "2062",
+            "color": [255, 180, 0],
+            "lifetime": 3600
+          }
+
+# ==============================================================================
+# 5. DRYER: Finished Alert & Persistent Reminder
+# ==============================================================================
+- id: dryer_finished_notification
+  alias: "Trockner: Fertig Benachrichtigung & Erinnerung"
+  description: "Sofortige Pop-up Meldung mit Chime und persistente Bildschirmschleife wenn Trockner fertig ist"
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.dryer_program_progress
+      above: 99
+    - platform: state
+      entity_id: sensor.dryer_program_finished
+      to: "present"
+    - platform: state
+      entity_id: sensor.dryer_drying_process_finished
+      to: "present"
+    - platform: state
+      entity_id: sensor.dryer_operation_state
+      to: "finished"
+  action:
+    - choose:
+        - conditions:
+            - condition: time
+              after: "08:00:00"
+              before: "22:00:00"
+          sequence:
+            - service: mqtt.publish
+              data:
+                topic: "awtrix/notify"
+                payload: >-
+                  {
+                    "text": "TROCKNER FERTIG",
+                    "icon": "2062",
+                    "duration": 15,
+                    "color": [255, 180, 0],
+                    "rtttl": "two_short:d=4,o=5,b=100:16e6,16e6"
+                  }
+      default:
+        - service: mqtt.publish
+          data:
+            topic: "awtrix/notify"
+            payload: >-
+              {
+                "text": "TROCKNER FERTIG",
+                "icon": "2062",
+                "duration": 15,
+                "color": [255, 180, 0]
+              }
+    - service: mqtt.publish
+      data:
+        topic: "awtrix/custom/dryer"
+        payload: >-
+          {
+            "text": "TROCKNER FERTIG",
+            "icon": "2062",
+            "color": [255, 180, 0],
+            "lifetime": 21600
+          }
+
+# ==============================================================================
+# 6. DRYER: Dismiss / Clear Screen
+# ==============================================================================
+- id: dryer_dismiss_reminder
+  alias: "Trockner: Erinnerung löschen bei Türöffnung oder Taste"
+  description: "Löscht den Trockner-Bildschirm wenn Tür geöffnet oder Taste gedrückt"
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.dryer_door
+      to: "on"
+    - platform: state
+      entity_id: binary_sensor.awtrix_ng_button_select
+      to: "on"
+  action:
+    - service: mqtt.publish
+      data:
+        topic: "awtrix/custom/dryer"
+        payload: "{}"
+
+# ==============================================================================
+# 7. APPLIANCE WARNINGS / ERRORS (i-DOS & Operational Alerts)
+# ==============================================================================
+- id: washer_idos_warning
+  alias: "Waschmaschine: i-DOS Nachfüll-Warnung"
+  description: "Warnt wenn Waschmittel oder Weichspüler fast leer ist"
+  trigger:
+    - platform: state
+      entity_id: sensor.washing_machine_poor_i_dos_1_fill_level
+      to: "present"
+    - platform: state
+      entity_id: sensor.washing_machine_poor_i_dos_2_fill_level
+      to: "present"
+  action:
+    - service: mqtt.publish
+      data:
+        topic: "awtrix/notify"
+        payload: >-
+          {
+            "text": "i-DOS LEER",
+            "icon": "638",
+            "duration": 10,
+            "color": [255, 80, 0]
+          }
