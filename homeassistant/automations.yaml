@@ -473,7 +473,9 @@
   description: "Prüft beim Abschließen der Haustür ob Waschmaschine oder Trockner noch laufen oder fertige Wäsche in der Trommel liegt"
   trigger:
     - platform: state
-      entity_id: lock.nuki_smart_lock
+      entity_id:
+        - lock.eingangstur
+        - lock.nuki_smart_lock
       to: "locked"
   condition:
     - condition: template
@@ -536,7 +538,9 @@
   description: "Erinnert beim Aufschließen der Haustür sofort an fertige Wäsche und reaktiviert die Rotationsanzeige"
   trigger:
     - platform: state
-      entity_id: lock.nuki_smart_lock
+      entity_id:
+        - lock.eingangstur
+        - lock.nuki_smart_lock
       to: "unlocked"
   condition:
     - condition: template
@@ -585,7 +589,10 @@
   description: "Warnt wenn der Nuki Türkontakt länger als 5 Minuten geöffnet bleibt (Chime nur tagsüber)"
   trigger:
     - platform: state
-      entity_id: binary_sensor.nuki_door_sensor
+      entity_id:
+        - binary_sensor.eingangstur_door
+        - binary_sensor.eingangstur_door_sensor
+        - binary_sensor.nuki_door_sensor
       to: "on"
       for: "00:05:00"
   action:
@@ -613,15 +620,21 @@
     - platform: time
       at: "22:00:00"
     - platform: state
-      entity_id: lock.nuki_smart_lock
+      entity_id:
+        - lock.eingangstur
+        - lock.nuki_smart_lock
       to: "unlocked"
   condition:
     - condition: time
       after: "22:00:00"
       before: "06:00:00"
-    - condition: state
-      entity_id: lock.nuki_smart_lock
-      state: "unlocked"
+    - condition: template
+      value_template: >-
+        {% set lock_state = states('lock.eingangstur') %}
+        {% if lock_state in ['unknown', 'unavailable'] %}
+          {% set lock_state = states('lock.nuki_smart_lock') %}
+        {% endif %}
+        {{ lock_state == 'unlocked' }}
   action:
     - service: mqtt.publish
       data:
@@ -655,7 +668,9 @@
   description: "Löscht den Nachtsperren-Bildschirm sofort sobald die Haustür verriegelt wird"
   trigger:
     - platform: state
-      entity_id: lock.nuki_smart_lock
+      entity_id:
+        - lock.eingangstur
+        - lock.nuki_smart_lock
       to: "locked"
   action:
     - service: mqtt.publish
@@ -675,8 +690,10 @@
   condition:
     - condition: template
       value_template: >-
-        {% set batt = states('sensor.nuki_smart_lock_battery_level') | int(100) %}
-        {% set crit = states('binary_sensor.nuki_smart_lock_battery_critical') | lower in ['on', 'true'] %}
+        {% set batt_entity = 'sensor.eingangstur_battery' if states('sensor.eingangstur_battery') not in ['unknown', 'unavailable'] else 'sensor.nuki_smart_lock_battery_level' %}
+        {% set crit_entity = 'binary_sensor.eingangstur_battery' if states('binary_sensor.eingangstur_battery') not in ['unknown', 'unavailable'] else 'binary_sensor.nuki_smart_lock_battery_critical' %}
+        {% set batt = states(batt_entity) | int(100) %}
+        {% set crit = states(crit_entity) | lower in ['on', 'true'] %}
         {{ batt < 20 or crit }}
   action:
     - service: mqtt.publish
@@ -698,7 +715,9 @@
   description: "Zeigt 5 Sekunden lang den neuen Türstatus auf dem Display"
   trigger:
     - platform: state
-      entity_id: lock.nuki_smart_lock
+      entity_id:
+        - lock.eingangstur
+        - lock.nuki_smart_lock
   condition:
     - condition: template
       value_template: >-
