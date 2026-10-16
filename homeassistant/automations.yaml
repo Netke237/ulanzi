@@ -148,7 +148,7 @@
         payload: >-
           {
             "text": "TROCKNET {{ pct }}%",
-            "icon": "2062",
+            "icon": "trockner_trocknen",
             "textColor": "#FFA500",
             "lifetimeMs": 3600000
           }
@@ -185,7 +185,7 @@
                 payload: >-
                   {
                     "text": "TROCKNER FERTIG",
-                    "icon": "2062",
+                    "icon": "trockner_fertig",
                     "textColor": "#FFA500",
                     "durationMs": 15000,
                     "sound": {
@@ -199,7 +199,7 @@
             payload: >-
               {
                 "text": "TROCKNER FERTIG",
-                "icon": "2062",
+                "icon": "trockner_fertig",
                 "textColor": "#FFA500",
                 "durationMs": 15000
               }
@@ -209,7 +209,7 @@
         payload: >-
           {
             "text": "TROCKNER FERTIG",
-            "icon": "2062",
+            "icon": "trockner_fertig",
             "textColor": "#FFA500",
             "lifetimeMs": 21600000
           }
@@ -253,7 +253,7 @@
         payload: >-
           {
             "text": "i-DOS LEER",
-            "icon": "638",
+            "icon": "idos_warnung",
             "textColor": "#FF3B30",
             "durationMs": 10000
           }
