@@ -28,6 +28,20 @@ Domain vocabulary and architectural concepts for the Ulanzi desktop project.
 
 - **`DWD (Deutscher Wetterdienst)`**: Official German meteorological service integrated into Home Assistant via the DWD Weather & DWD Warnings integrations, supplying local radar forecasts, temperature predictions, and tiered severe weather/storm warnings.
 - **`AWTRIX Icon Flash Storage (/ICONS/)`**: The on-device SPIFFS/LittleFS storage on the TC001 ESP32 where 8×8 pixel-art GIF icons (`sun.gif`, `storm.gif`, `wind.gif`, `rain.gif`, etc.) are cached and referenced locally by filename without internet CDN dependencies.
-- **`Weather Rotation Apps`**: Custom AWTRIX apps (`awtrix/custom/weather_now` and `awtrix/custom/weather_forecast`) injected into the continuous matrix cycle displaying current temperature, daily forecast (high/low), and wind conditions alongside matching pixel icons.
-- **`Severe Weather Push Alert`**: High-priority transient alert (`awtrix/notify`) that preempts the normal rotation with a flashing storm/wind icon, alert description, and audible chime when DWD warning levels exceed threshold.
+- **`Weather Rotation Apps`**: Custom AWTRIX apps (`weather_now`, `weather_today`, and `weather_tomorrow`) injected into the continuous matrix cycle displaying current temperature, today's high/low (or active wind speed), and tomorrow's forecast alongside matching animated pixel-art icons.
+- **`Severe Weather Push Alert`**: High-priority transient alert (`awtrix/cmd/notify`) that preempts the normal rotation with a flashing storm/wind icon, alert description, and audible chime when DWD warning levels exceed threshold.
+
+## Nuki Smart Lock & Door Security
+
+- **`Nuki Smart Lock`**: Motorized smart lock mounted onto the internal euro-profile cylinder of the entrance door, exposing lock/unlock state and motor actuation.
+- **`Nuki Bridge (HTTP API)`**: Local Wi-Fi hardware bridge connecting to Nuki via Bluetooth Low Energy and exposing an authenticated local REST API on port 8080 (`/list`, `/lockAction`, `/callback/add`) for sub-second push callbacks to Home Assistant without cloud dependencies.
+- **`Nuki Door Sensor`**: Magnetic contact sensor installed on the door frame reporting physical position (`open` or `closed`), distinguishing physical door status from motor lock position.
+
+## Cross-Device Interlocks & Security Curfew
+
+- **`Departure Interlock`**: A 5-second transient check executed the moment the entrance door is locked, querying Home Connect telemetry and warning the user via Ulanzi popup (and audio chime if laundry is waiting in the drum) before they leave the premises.
+- **`Arrival Task Digest`**: An automated welcome sequence triggered when the entrance door is unlocked upon returning home, alerting to completed appliance cycles and reviving persistent reminders on the desktop display.
+- **`Night Lock Curfew`**: A safety automation active from 22:00 displaying a persistent red lock warning on the Ulanzi TC001 matrix until the entrance door is locked.
+- **`Door Left Open Alarm`**: A safety alert triggered if the Nuki magnetic contact sensor remains open for more than 5 minutes, popping up an alert on Ulanzi with audible alarm during daytime (muted at night).
+
 

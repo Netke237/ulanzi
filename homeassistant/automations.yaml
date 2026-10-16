@@ -257,3 +257,467 @@
             "textColor": "#FF3B30",
             "durationMs": 10000
           }
+
+# ==============================================================================
+# 8. WEATHER: Current Conditions Rotation App (weather_now)
+# ==============================================================================
+- id: awtrix_weather_current_screen
+  alias: "Wetter: Aktuelles Wetter auf Ulanzi (weather_now)"
+  description: "Aktualisiert die aktuelle Wetteranzeige im AWTRIX-Rotationszyklus mit passendem 8x8 Pixel-Icon"
+  trigger:
+    - platform: time_pattern
+      minutes: "/5"
+    - platform: state
+      entity_id: weather.dwd_weather
+    - platform: homeassistant
+      event: start
+  action:
+    - variables:
+        weather_entity: >-
+          {% set dwd = states('weather.dwd_weather') %}
+          {% if dwd not in ['unknown', 'unavailable', 'None', ''] %}
+            weather.dwd_weather
+          {% else %}
+            {% set w_list = states.weather | map(attribute='entity_id') | list %}
+            {{ w_list[0] if w_list | length > 0 else 'weather.home' }}
+          {% endif %}
+        condition: "{{ states(weather_entity) | lower }}"
+        temp: "{{ state_attr(weather_entity, 'temperature') | round(0, default=0) }}"
+        weather_icon: >-
+          {% if condition in ['sunny', 'clear-night'] %}
+            sun
+          {% elif condition in ['partlycloudy', 'cloudy', 'overcast'] %}
+            cloud
+          {% elif condition in ['rainy', 'pouring'] %}
+            rain
+          {% elif condition in ['lightning', 'lightning-rainy'] %}
+            storm
+          {% elif condition in ['windy', 'windy-variant'] %}
+            wind
+          {% elif condition in ['snowy', 'snowy-rainy', 'hail'] %}
+            snow
+          {% elif condition in ['fog', 'exceptional'] %}
+            fog
+          {% else %}
+            sun
+          {% endif %}
+    - service: mqtt.publish
+      data:
+        topic: "awtrix/cmd/apps/pushed/weather_now"
+        payload: >-
+          {
+            "text": "{{ temp }}°C",
+            "icon": "{{ weather_icon }}",
+            "textColor": "#FFFFFF",
+            "durationMs": 5000
+          }
+
+# ==============================================================================
+# 9. WEATHER: Today's Forecast & Dynamic Wind Screen (weather_today)
+# ==============================================================================
+- id: awtrix_weather_today_screen
+  alias: "Wetter: Heutige Vorhersage & Wind auf Ulanzi (weather_today)"
+  description: "Zeigt standardmäßig Min/Max für heute, schaltet bei Wind (>30 km/h) automatisch auf Windgeschwindigkeit um"
+  trigger:
+    - platform: time_pattern
+      minutes: "/5"
+    - platform: state
+      entity_id: weather.dwd_weather
+    - platform: homeassistant
+      event: start
+  action:
+    - variables:
+        weather_entity: >-
+          {% set dwd = states('weather.dwd_weather') %}
+          {% if dwd not in ['unknown', 'unavailable', 'None', ''] %}
+            weather.dwd_weather
+          {% else %}
+            {% set w_list = states.weather | map(attribute='entity_id') | list %}
+            {{ w_list[0] if w_list | length > 0 else 'weather.home' }}
+          {% endif %}
+        wind_speed: "{{ state_attr(weather_entity, 'wind_speed') | round(0, default=0) }}"
+        temp_high: "{{ state_attr(weather_entity, 'forecast')[0].temperature | round(0, default=0) if state_attr(weather_entity, 'forecast') else state_attr(weather_entity, 'temperature') | round(0, default=0) }}"
+        temp_low: "{{ state_attr(weather_entity, 'forecast')[0].templow | round(0, default=0) if state_attr(weather_entity, 'forecast') and state_attr(weather_entity, 'forecast')[0].templow is defined else (state_attr(weather_entity, 'temperature') | round(0, default=0) - 5) }}"
+        is_windy: "{{ wind_speed | int(0) > 30 }}"
+    - service: mqtt.publish
+      data:
+        topic: "awtrix/cmd/apps/pushed/weather_today"
+        payload: >-
+          {% if is_windy %}
+          {
+            "text": "{{ wind_speed }} km/h",
+            "icon": "wind",
+            "textColor": "#8CDCF0",
+            "durationMs": 5000
+          }
+          {% else %}
+          {
+            "text": "{{ temp_high }}° {{ temp_low }}°",
+            "icon": "cloud",
+            "textColor": "#FFD700",
+            "durationMs": 5000
+          }
+          {% endif %}
+
+# ==============================================================================
+# 10. WEATHER: Tomorrow's Forecast Rotation App (weather_tomorrow)
+# ==============================================================================
+- id: awtrix_weather_tomorrow_screen
+  alias: "Wetter: Vorhersage für Morgen auf Ulanzi (weather_tomorrow)"
+  description: "Zeigt Vorhersage für den morgigen Tag mit Wochentagskürzel (z.B. SA 17° 9°) und Wetter-Icon"
+  trigger:
+    - platform: time_pattern
+      minutes: "/5"
+    - platform: state
+      entity_id: weather.dwd_weather
+    - platform: homeassistant
+      event: start
+  action:
+    - variables:
+        weather_entity: >-
+          {% set dwd = states('weather.dwd_weather') %}
+          {% if dwd not in ['unknown', 'unavailable', 'None', ''] %}
+            weather.dwd_weather
+          {% else %}
+            {% set w_list = states.weather | map(attribute='entity_id') | list %}
+            {{ w_list[0] if w_list | length > 0 else 'weather.home' }}
+          {% endif %}
+        day_names: "MO,DI,MI,DO,FR,SA,SO"
+        tmrw_day: "{{ day_names.split(',')[(now().weekday() + 1) % 7] }}"
+        tmrw_fc: "{{ state_attr(weather_entity, 'forecast')[1] if state_attr(weather_entity, 'forecast') and state_attr(weather_entity, 'forecast') | length > 1 else none }}"
+        tmrw_high: "{{ tmrw_fc.temperature | round(0, default=20) if tmrw_fc else 20 }}"
+        tmrw_low: "{{ tmrw_fc.templow | round(0, default=12) if tmrw_fc and tmrw_fc.templow is defined else 12 }}"
+        tmrw_condition: "{{ tmrw_fc.condition | lower if tmrw_fc and tmrw_fc.condition is defined else 'cloudy' }}"
+        tmrw_icon: >-
+          {% if tmrw_condition in ['sunny', 'clear-night'] %}
+            sun
+          {% elif tmrw_condition in ['partlycloudy', 'cloudy', 'overcast'] %}
+            cloud
+          {% elif tmrw_condition in ['rainy', 'pouring'] %}
+            rain
+          {% elif tmrw_condition in ['lightning', 'lightning-rainy'] %}
+            storm
+          {% elif tmrw_condition in ['windy', 'windy-variant'] %}
+            wind
+          {% elif tmrw_condition in ['snowy', 'snowy-rainy', 'hail'] %}
+            snow
+          {% elif tmrw_condition in ['fog', 'exceptional'] %}
+            fog
+          {% else %}
+            cloud
+          {% endif %}
+    - service: mqtt.publish
+      data:
+        topic: "awtrix/cmd/apps/pushed/weather_tomorrow"
+        payload: >-
+          {
+            "text": "{{ tmrw_day }} {{ tmrw_high }}° {{ tmrw_low }}°",
+            "icon": "{{ tmrw_icon }}",
+            "textColor": "#64C8FF",
+            "durationMs": 5000
+          }
+
+# ==============================================================================
+# 11. WEATHER: Severe Storm & Wind Warning Popup Alert (awtrix/cmd/notify)
+# ==============================================================================
+- id: awtrix_weather_severe_alert
+  alias: "Wetter: Unwetter- & Sturm-Alarmierung auf Ulanzi"
+  description: "Löst bei DWD Warnstufe 2 (Orange) oder Windböen >60 km/h sofortige Popup-Meldung mit Chime aus"
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.dwd_weather_warnings_current_warning_level
+      above: 1
+    - platform: numeric_state
+      entity_id: sensor.dwd_weather_warnings_advance_warning_level
+      above: 2
+    - platform: numeric_state
+      entity_id: sensor.dwd_weather_wind_gusts
+      above: 60
+  condition:
+    - condition: template
+      value_template: >-
+        {{ trigger.to_state.state not in ['unknown', 'unavailable', 'None', ''] }}
+  action:
+    - variables:
+        is_night: "{{ now().hour >= 22 or now().hour < 8 }}"
+        warning_name: >-
+          {% set dwd_name = states('sensor.dwd_weather_warnings_current_warning_name') %}
+          {% if dwd_name not in ['unknown', 'unavailable', 'None', ''] %}
+            {{ dwd_name | upper }}
+          {% else %}
+            UNWETTERWARNUNG
+          {% endif %}
+        alert_icon: >-
+          {% if 'WIND' in warning_name or 'STURM' in warning_name or trigger.entity_id == 'sensor.dwd_weather_wind_gusts' %}
+            wind
+          {% else %}
+            storm
+          {% endif %}
+    - service: mqtt.publish
+      data:
+        topic: "awtrix/cmd/notify"
+        payload: >-
+          {
+            "text": "{{ warning_name }}",
+            "icon": "{{ alert_icon }}",
+            "textColor": "#FF3B30",
+            "durationMs": 15000
+            {% if not is_night %}, "sound": {"rtttl": "siren:d=8,o=5,b=100:d,e,d,e,d,e"} {% endif %}
+          }
+
+# ==============================================================================
+# 12. NUKI & HOME CONNECT: Departure Interlock (5s Alert on Door Lock)
+# ==============================================================================
+- id: nuki_departure_interlock
+  alias: "Nuki & Home Connect: Abfahrts-Prüfung bei Türverriegelung"
+  description: "Prüft beim Abschließen der Haustür ob Waschmaschine oder Trockner noch laufen oder fertige Wäsche in der Trommel liegt"
+  trigger:
+    - platform: state
+      entity_id: lock.nuki_smart_lock
+      to: "locked"
+  condition:
+    - condition: template
+      value_template: >-
+        {% set w_op = states('sensor.washing_machine_operation_state') | lower %}
+        {% set d_op = states('sensor.dryer_operation_state') | lower %}
+        {% set w_fin = states('sensor.washing_machine_program_finished') | lower in ['present', 'true', 'on'] or w_op == 'finished' %}
+        {% set d_fin = states('sensor.dryer_program_finished') | lower in ['present', 'true', 'on'] or states('sensor.dryer_drying_process_finished') | lower in ['present', 'true', 'on'] or d_op == 'finished' %}
+        {% set w_run = w_op in ['run', 'delayedstart'] %}
+        {% set d_run = d_op in ['run', 'delayedstart'] %}
+        {{ w_fin or d_fin or w_run or d_run }}
+  action:
+    - variables:
+        w_op: "{{ states('sensor.washing_machine_operation_state') | lower }}"
+        d_op: "{{ states('sensor.dryer_operation_state') | lower }}"
+        w_fin: "{{ states('sensor.washing_machine_program_finished') | lower in ['present', 'true', 'on'] or w_op == 'finished' }}"
+        d_fin: "{{ states('sensor.dryer_program_finished') | lower in ['present', 'true', 'on'] or states('sensor.dryer_drying_process_finished') | lower in ['present', 'true', 'on'] or d_op == 'finished' }}"
+        w_run: "{{ w_op in ['run', 'delayedstart'] }}"
+        d_run: "{{ d_op in ['run', 'delayedstart'] }}"
+        alert_text: >-
+          {% if w_fin and d_fin %}
+            WÄSCHE & TROCKNER FERTIG
+          {% elif w_fin %}
+            WÄSCHE IN TROMMEL
+          {% elif d_fin %}
+            TROCKNER FERTIG
+          {% elif w_run and d_run %}
+            GERÄTE LAUFEN NOCH
+          {% elif w_run %}
+            WÄSCHE LÄUFT NOCH
+          {% elif d_run %}
+            TROCKNER LÄUFT NOCH
+          {% else %}
+            GERÄT AKTIV
+          {% endif %}
+        alert_icon: >-
+          {% if w_fin or w_run %}
+            waschmaschine_waschen
+          {% else %}
+            trockner_trocknen
+          {% endif %}
+        has_finished_laundry: "{{ w_fin or d_fin }}"
+    - service: mqtt.publish
+      data:
+        topic: "awtrix/cmd/notify"
+        payload: >-
+          {
+            "text": "{{ alert_text }}",
+            "icon": "{{ alert_icon }}",
+            "textColor": "{% if has_finished_laundry %}#FF9100{% else %}#64C8FF{% endif %}",
+            "durationMs": 5000
+            {% if has_finished_laundry %}, "sound": {"rtttl": "bell:d=4,o=5,b=100:e,c"} {% endif %}
+          }
+
+# ==============================================================================
+# 13. NUKI & HOME CONNECT: Arrival Task Digest (Door Unlocked)
+# ==============================================================================
+- id: nuki_arrival_task_digest
+  alias: "Nuki & Home Connect: Ankunfts-Benachrichtigung bei Türentriegelung"
+  description: "Erinnert beim Aufschließen der Haustür sofort an fertige Wäsche und reaktiviert die Rotationsanzeige"
+  trigger:
+    - platform: state
+      entity_id: lock.nuki_smart_lock
+      to: "unlocked"
+  condition:
+    - condition: template
+      value_template: >-
+        {% set w_op = states('sensor.washing_machine_operation_state') | lower %}
+        {% set d_op = states('sensor.dryer_operation_state') | lower %}
+        {% set w_fin = states('sensor.washing_machine_program_finished') | lower in ['present', 'true', 'on'] or w_op == 'finished' %}
+        {% set d_fin = states('sensor.dryer_program_finished') | lower in ['present', 'true', 'on'] or states('sensor.dryer_drying_process_finished') | lower in ['present', 'true', 'on'] or d_op == 'finished' %}
+        {{ w_fin or d_fin }}
+  action:
+    - variables:
+        w_op: "{{ states('sensor.washing_machine_operation_state') | lower }}"
+        w_fin: "{{ states('sensor.washing_machine_program_finished') | lower in ['present', 'true', 'on'] or w_op == 'finished' }}"
+        digest_text: >-
+          {% if w_fin %}
+            WILLKOMMEN: WÄSCHE FERTIG
+          {% else %}
+            WILLKOMMEN: TROCKNER FERTIG
+          {% endif %}
+        digest_icon: >-
+          {% if w_fin %}
+            waschmaschine_fertig
+          {% else %}
+            trockner_fertig
+          {% endif %}
+    # Sofortige 10s Pop-up Meldung mit Chime
+    - service: mqtt.publish
+      data:
+        topic: "awtrix/cmd/notify"
+        payload: >-
+          {
+            "text": "{{ digest_text }}",
+            "icon": "{{ digest_icon }}",
+            "textColor": "#00FF80",
+            "durationMs": 10000,
+            "sound": {
+              "rtttl": "bell:d=4,o=5,b=100:c,e,g"
+            }
+          }
+
+# ==============================================================================
+# 14. NUKI: Door Left Open Security Alarm (> 5 Minutes Open)
+# ==============================================================================
+- id: nuki_door_left_open_alarm
+  alias: "Nuki: Haustür länger als 5 Minuten offen Alarm"
+  description: "Warnt wenn der Nuki Türkontakt länger als 5 Minuten geöffnet bleibt (Chime nur tagsüber)"
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.nuki_door_sensor
+      to: "on"
+      for: "00:05:00"
+  action:
+    - variables:
+        is_night: "{{ now().hour >= 22 or now().hour < 8 }}"
+    - service: mqtt.publish
+      data:
+        topic: "awtrix/cmd/notify"
+        payload: >-
+          {
+            "text": "TÜR OFFEN!",
+            "icon": "door_open",
+            "textColor": "#FF3B30",
+            "durationMs": 10000
+            {% if not is_night %}, "sound": {"rtttl": "alert:d=8,o=5,b=120:e,e,e"} {% endif %}
+          }
+
+# ==============================================================================
+# 15. NUKI: Night Lock Curfew (22:00 Reminder until Locked)
+# ==============================================================================
+- id: nuki_night_lock_curfew
+  alias: "Nuki: Nachtsperre Erinnerung ab 22:00 Uhr"
+  description: "Blendet ab 22:00 Uhr eine persistente Warnung ein solange die Haustür noch nicht abgeschlossen ist"
+  trigger:
+    - platform: time
+      at: "22:00:00"
+    - platform: state
+      entity_id: lock.nuki_smart_lock
+      to: "unlocked"
+  condition:
+    - condition: time
+      after: "22:00:00"
+      before: "06:00:00"
+    - condition: state
+      entity_id: lock.nuki_smart_lock
+      state: "unlocked"
+  action:
+    - service: mqtt.publish
+      data:
+        topic: "awtrix/cmd/apps/pushed/nuki_night"
+        payload: >-
+          {
+            "text": "BITTE ABSCHLIESSEN",
+            "icon": "nuki_unlocked",
+            "textColor": "#FF3B30",
+            "lifetimeMs": 28800000
+          }
+    - service: mqtt.publish
+      data:
+        topic: "awtrix/cmd/notify"
+        payload: >-
+          {
+            "text": "TÜR NICHT ABGESCHLOSSEN",
+            "icon": "nuki_unlocked",
+            "textColor": "#FF3B30",
+            "durationMs": 5000,
+            "sound": {
+              "rtttl": "notice:d=4,o=4,b=100:e,c"
+            }
+          }
+
+# ==============================================================================
+# 16. NUKI: Night Lock Curfew Dismissal
+# ==============================================================================
+- id: nuki_night_lock_dismiss
+  alias: "Nuki: Nachtsperre Warnung löschen bei Türverriegelung"
+  description: "Löscht den Nachtsperren-Bildschirm sofort sobald die Haustür verriegelt wird"
+  trigger:
+    - platform: state
+      entity_id: lock.nuki_smart_lock
+      to: "locked"
+  action:
+    - service: mqtt.publish
+      data:
+        topic: "awtrix/cmd/apps/pushed/nuki_night"
+        payload: "{}"
+
+# ==============================================================================
+# 17. NUKI: Daily Low Battery Digest (09:00 Uhr)
+# ==============================================================================
+- id: nuki_daily_battery_digest
+  alias: "Nuki: Batteriewarnung bei schwachem Akkustand"
+  description: "Warnt morgens um 09:00 Uhr wenn die Nuki Batterie unter 20% fällt"
+  trigger:
+    - platform: time
+      at: "09:00:00"
+  condition:
+    - condition: template
+      value_template: >-
+        {% set batt = states('sensor.nuki_smart_lock_battery_level') | int(100) %}
+        {% set crit = states('binary_sensor.nuki_smart_lock_battery_critical') | lower in ['on', 'true'] %}
+        {{ batt < 20 or crit }}
+  action:
+    - service: mqtt.publish
+      data:
+        topic: "awtrix/cmd/notify"
+        payload: >-
+          {
+            "text": "NUKI BATTERIE LADEN",
+            "icon": "battery_low",
+            "textColor": "#FF9100",
+            "durationMs": 10000
+          }
+
+# ==============================================================================
+# 18. NUKI: Transient Lock/Unlock Event Notification
+# ==============================================================================
+- id: nuki_transient_door_event
+  alias: "Nuki: Kurze Statusmeldung bei Verriegelung/Entriegelung"
+  description: "Zeigt 5 Sekunden lang den neuen Türstatus auf dem Display"
+  trigger:
+    - platform: state
+      entity_id: lock.nuki_smart_lock
+  condition:
+    - condition: template
+      value_template: >-
+        {{ trigger.from_state is defined 
+           and trigger.to_state is defined 
+           and trigger.from_state.state != trigger.to_state.state 
+           and trigger.to_state.state in ['locked', 'unlocked'] }}
+  action:
+    - variables:
+        is_locked: "{{ trigger.to_state.state == 'locked' }}"
+    - service: mqtt.publish
+      data:
+        topic: "awtrix/cmd/notify"
+        payload: >-
+          {
+            "text": "{% if is_locked %}TÜR VERRIEGELT{% else %}TÜR ENTSPERRT{% endif %}",
+            "icon": "{% if is_locked %}nuki_locked{% else %}nuki_unlocked{% endif %}",
+            "textColor": "{% if is_locked %}#00FF80{% else %}#FFA500{% endif %}",
+            "durationMs": 5000
+          }
+
+

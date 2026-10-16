@@ -14,10 +14,11 @@ The Ulanzi TC001 8×32 WS2812B LED matrix has limited horizontal resolution (24 
    - Automatically resolves local station data and warning cell identifier using Home Assistant's configured `zone.home` GPS coordinates.
    - Supplies local weather observations, hourly/daily forecasts, and official warning levels (Gelb, Orange, Rot, Violett) for storm and wind events without API keys.
 
-2. **Display Architecture (Dual App Rotation)**:
-   - Implement two complementary custom apps in the AWTRIX rotation:
+2. **Display Architecture (3-Screen Weather Rotation)**:
+   - Implement three complementary custom apps in the AWTRIX rotation:
      - **App 1 (`weather_now`)**: Current condition icon + current temperature (e.g., `[☀️] 19°C`).
-     - **App 2 (`weather_forecast`)**: Dynamic secondary display showing today's High/Low (`[⛅] 23° 14°`) by default, automatically switching to live Wind Speed (`[💨] 35 km/h` or `[💨] 35k`) whenever local wind speeds exceed 30 km/h.
+     - **App 2 (`weather_today`)**: Dynamic secondary display showing today's High/Low (`[⛅] 23° 14°`) by default, automatically switching to live Wind Speed (`[💨] 35 km/h`) whenever local wind speeds exceed 30 km/h.
+     - **App 3 (`weather_tomorrow`)**: Tomorrow's forecast with weekday abbreviation and condition icon (e.g., `[🌧️] SA 17° 9°`).
    - Screen duration: 5 seconds per app in the rotation cycle.
 
 3. **Icon Management & Provisioning**:

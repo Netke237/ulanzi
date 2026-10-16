@@ -123,8 +123,36 @@ python scripts/upload_weather_icons.py --ip 192.168.55.xxx
 
 ### 3. Display Behavior & Severe Storm Warnings
 - **App 1 (`weather_now`)**: Displays current condition icon + temperature (e.g. `[☀️] 19°C`).
-- **App 2 (`weather_forecast`)**: Displays daily High/Low (e.g. `[⛅] 23° 14°`), dynamically switching to live wind speed (`[💨] 35 km/h`) whenever wind exceeds 30 km/h.
-- **Urgent Unwetter/Gale Popup Alert (`awtrix/notify`)**: Triggers an immediate flashing popup with storm/wind icon and chime when DWD Warning Level 2 (Orange) or wind gusts > 60 km/h occur (audio chime muted 22:00–08:00).
+- **App 2 (`weather_today`)**: Displays today's High/Low (e.g. `[⛅] 23° 14°`), dynamically switching to live wind speed (`[💨] 35 km/h`) whenever wind exceeds 30 km/h.
+- **App 3 (`weather_tomorrow`)**: Displays tomorrow's forecast with weekday abbreviation and condition icon (e.g. `[🌧️] SA 17° 9°`).
+- **Urgent Unwetter/Gale Popup Alert (`awtrix/cmd/notify`)**: Triggers an immediate flashing popup with storm/wind icon and chime when DWD Warning Level 2 (Orange) or wind gusts > 60 km/h occur (audio chime muted 22:00–08:00).
+
+---
+
+## 6. Nuki Smart Lock & Home Connect Interlocks
+
+As defined in [ADR 0006](docs/adr/0006-nuki-smart-lock-and-home-connect-interlocks.md), the entrance door **Nuki Smart Lock**, **Nuki Bridge** (Local HTTP API on port 8080), and **Nuki Door Sensor** are coordinated with **BSH Home Connect** appliances and the **Ulanzi TC001** display:
+
+### 1. Upload Nuki Icons to Clock
+The repository includes curated 8×8 pixel-art GIF icons (`nuki_locked.gif`, `nuki_unlocked.gif`, `door_open.gif`, `battery_low.gif`) in `assets/icons/nuki/`.
+
+Upload them directly to the Ulanzi TC001 LittleFS flash storage (`/ICONS/`):
+```powershell
+python scripts/upload_nuki_icons.py --ip 192.168.55.xxx
+```
+
+### 2. Connect Nuki via Local Bridge API in Home Assistant
+1. In the Nuki smartphone app, go to **Settings** -> **Features & Configuration** -> **Nuki Bridge** -> **Developer Mode / HTTP API**.
+2. Enable HTTP API and note the local IP and API token.
+3. In Home Assistant, go to **Settings** -> **Devices & Services** -> **Add Integration** -> **Nuki**.
+4. Enter the Bridge IP and API token. The bridge will automatically register sub-second push callbacks directly to `http://192.168.55.60:8123`.
+
+### 3. Smart Interlock Automations
+- **Departure Interlock (5s Popup)**: When the front door locks, Home Assistant checks whether the washing machine or dryer is currently running or finished with laundry remaining. A 5-second popup appears on the Ulanzi clock (`WÄSCHE LÄUFT NOCH` or `WÄSCHE IN TROMMEL` with chime for finished laundry).
+- **Arrival Task Digest (10s Popup)**: When unlocking the door upon returning home, if laundry finished while away, an immediate 10-second alert (`WILLKOMMEN: WÄSCHE FERTIG`) sounds and re-activates the persistent reminder screen in the rotation.
+- **Door Left Open Security Alarm**: If the magnetic door sensor is open for more than 5 minutes, an urgent popup (`TÜR OFFEN!`) triggers on Ulanzi with alarm sound (audio muted 22:00–08:00).
+- **Night Lock Curfew (22:00)**: From 22:00 onwards, if the front door is still unlocked, a persistent red reminder screen (`BITTE ABSCHLIESSEN`) appears until the door is locked.
+- **Daily Battery Digest (09:00)**: Warns at 09:00 if the Nuki battery drops below 20%.
 
 ---
 
@@ -137,19 +165,24 @@ python scripts/upload_weather_icons.py --ip 192.168.55.xxx
 ├── docker-compose.yml          # Production Docker Compose for Mini PC
 ├── assets/
 │   └── icons/
+│       ├── appliances/         # 8x8 appliance icons (washer, dryer, i-DOS)
+│       ├── nuki/               # 8x8 Nuki lock, door, and battery icons
 │       └── weather/            # 8x8 animated pixel-art weather GIFs
 ├── homeassistant/
 │   ├── configuration.yaml      # Home Assistant core configuration
-│   └── automations.yaml        # Appliance, weather, and alert automations
+│   └── automations.yaml        # Appliance, Nuki, weather, and alert automations
 ├── mosquitto/
 │   └── config/
 │       └── mosquitto.conf      # Local MQTT broker configuration
 ├── docs/
-│   ├── adr/                    # Architecture Decision Records (0001–0005)
+│   ├── adr/                    # Architecture Decision Records (0001–0006)
 │   └── agents/                 # Agent specifications (issue tracker, domain rules)
 └── scripts/
     ├── deploy.ps1              # Deployment and verification script for Mini PC
+    ├── generate_nuki_icons.py  # Generator for 8x8 Nuki pixel-art GIFs
+    ├── upload_nuki_icons.py    # Uploader for Nuki icons to clock
     ├── download_weather_icons.py # Fetcher for curated 8x8 weather GIFs
-    └── upload_weather_icons.py   # Uploader to Ulanzi flash filesystem
+    └── upload_weather_icons.py   # Uploader for weather icons to clock
 ```
+
 
