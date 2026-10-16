@@ -33,7 +33,8 @@ Write-Host "`n[STEP 2] Updating repository on Mini PC..." -ForegroundColor Cyan
 $updateScript = @"
 if (Test-Path '$RemotePath') {
     Set-Location '$RemotePath'
-    git pull origin main
+    git fetch origin main
+    git reset --hard origin/main
 } else {
     git clone https://github.com/Netke237/ulanzi.git '$RemotePath'
     Set-Location '$RemotePath'
