@@ -109,12 +109,18 @@
 # 3. WASHING MACHINE: Dismiss / Clear Screen
 # ==============================================================================
 - id: washing_machine_dismiss_reminder
-  alias: "Waschmaschine: Erinnerung löschen bei Türöffnung oder Taste"
-  description: "Löscht den Waschmaschinen-Bildschirm wenn Tür geöffnet oder Select-Taste gedrückt"
+  alias: "Waschmaschine: Erinnerung löschen bei Türöffnung, Ausschalten oder Taste"
+  description: "Löscht den Waschmaschinen-Bildschirm wenn Tür geöffnet, Gerät ausgeschaltet oder Select-Taste gedrückt"
   trigger:
     - platform: state
       entity_id: binary_sensor.washing_machine_door
       to: "on"
+    - platform: state
+      entity_id: sensor.washing_machine_operation_state
+      to:
+        - "inactive"
+        - "ready"
+        - "unavailable"
     - platform: state
       entity_id: binary_sensor.awtrix_ng_button_select
       to: "on"
@@ -122,7 +128,7 @@
     - service: mqtt.publish
       data:
         topic: "awtrix/cmd/apps/pushed/washer"
-        payload: "{}"
+        payload: ""
 
 # ==============================================================================
 # 4. DRYER: Dynamic Progress Rotation App
@@ -218,12 +224,18 @@
 # 6. DRYER: Dismiss / Clear Screen
 # ==============================================================================
 - id: dryer_dismiss_reminder
-  alias: "Trockner: Erinnerung löschen bei Türöffnung oder Taste"
-  description: "Löscht den Trockner-Bildschirm wenn Tür geöffnet oder Taste gedrückt"
+  alias: "Trockner: Erinnerung löschen bei Türöffnung, Ausschalten oder Taste"
+  description: "Löscht den Trockner-Bildschirm wenn Tür geöffnet, Gerät ausgeschaltet oder Taste gedrückt"
   trigger:
     - platform: state
       entity_id: binary_sensor.dryer_door
       to: "on"
+    - platform: state
+      entity_id: sensor.dryer_operation_state
+      to:
+        - "inactive"
+        - "ready"
+        - "unavailable"
     - platform: state
       entity_id: binary_sensor.awtrix_ng_button_select
       to: "on"
@@ -231,7 +243,7 @@
     - service: mqtt.publish
       data:
         topic: "awtrix/cmd/apps/pushed/dryer"
-        payload: "{}"
+        payload: ""
 
 # ==============================================================================
 # 7. APPLIANCE WARNINGS / ERRORS (i-DOS & Operational Alerts)
@@ -482,19 +494,23 @@
       value_template: >-
         {% set w_op = states('sensor.washing_machine_operation_state') | lower %}
         {% set d_op = states('sensor.dryer_operation_state') | lower %}
-        {% set w_fin = states('sensor.washing_machine_program_finished') | lower in ['present', 'true', 'on'] or w_op == 'finished' %}
-        {% set d_fin = states('sensor.dryer_program_finished') | lower in ['present', 'true', 'on'] or states('sensor.dryer_drying_process_finished') | lower in ['present', 'true', 'on'] or d_op == 'finished' %}
-        {% set w_run = w_op in ['run', 'delayedstart'] %}
-        {% set d_run = d_op in ['run', 'delayedstart'] %}
+        {% set w_connected = w_op not in ['unavailable', 'unknown', 'inactive', 'off', ''] %}
+        {% set d_connected = d_op not in ['unavailable', 'unknown', 'inactive', 'off', ''] %}
+        {% set w_fin = w_connected and (states('sensor.washing_machine_program_finished') | lower in ['present', 'true', 'on'] or w_op == 'finished') %}
+        {% set d_fin = d_connected and (states('sensor.dryer_program_finished') | lower in ['present', 'true', 'on'] or states('sensor.dryer_drying_process_finished') | lower in ['present', 'true', 'on'] or d_op == 'finished') %}
+        {% set w_run = w_connected and w_op in ['run', 'delayedstart'] %}
+        {% set d_run = d_connected and d_op in ['run', 'delayedstart'] %}
         {{ w_fin or d_fin or w_run or d_run }}
   action:
     - variables:
         w_op: "{{ states('sensor.washing_machine_operation_state') | lower }}"
         d_op: "{{ states('sensor.dryer_operation_state') | lower }}"
-        w_fin: "{{ states('sensor.washing_machine_program_finished') | lower in ['present', 'true', 'on'] or w_op == 'finished' }}"
-        d_fin: "{{ states('sensor.dryer_program_finished') | lower in ['present', 'true', 'on'] or states('sensor.dryer_drying_process_finished') | lower in ['present', 'true', 'on'] or d_op == 'finished' }}"
-        w_run: "{{ w_op in ['run', 'delayedstart'] }}"
-        d_run: "{{ d_op in ['run', 'delayedstart'] }}"
+        w_connected: "{{ states('sensor.washing_machine_operation_state') | lower not in ['unavailable', 'unknown', 'inactive', 'off', ''] }}"
+        d_connected: "{{ states('sensor.dryer_operation_state') | lower not in ['unavailable', 'unknown', 'inactive', 'off', ''] }}"
+        w_fin: "{{ w_connected and (states('sensor.washing_machine_program_finished') | lower in ['present', 'true', 'on'] or states('sensor.washing_machine_operation_state') | lower == 'finished') }}"
+        d_fin: "{{ d_connected and (states('sensor.dryer_program_finished') | lower in ['present', 'true', 'on'] or states('sensor.dryer_drying_process_finished') | lower in ['present', 'true', 'on'] or states('sensor.dryer_operation_state') | lower == 'finished') }}"
+        w_run: "{{ w_connected and states('sensor.washing_machine_operation_state') | lower in ['run', 'delayedstart'] }}"
+        d_run: "{{ d_connected and states('sensor.dryer_operation_state') | lower in ['run', 'delayedstart'] }}"
         alert_text: >-
           {% if w_fin and d_fin %}
             WÄSCHE & TROCKNER FERTIG
@@ -547,8 +563,10 @@
       value_template: >-
         {% set w_op = states('sensor.washing_machine_operation_state') | lower %}
         {% set d_op = states('sensor.dryer_operation_state') | lower %}
-        {% set w_fin = states('sensor.washing_machine_program_finished') | lower in ['present', 'true', 'on'] or w_op == 'finished' %}
-        {% set d_fin = states('sensor.dryer_program_finished') | lower in ['present', 'true', 'on'] or states('sensor.dryer_drying_process_finished') | lower in ['present', 'true', 'on'] or d_op == 'finished' %}
+        {% set w_connected = w_op not in ['unavailable', 'unknown', 'inactive', 'off', ''] %}
+        {% set d_connected = d_op not in ['unavailable', 'unknown', 'inactive', 'off', ''] %}
+        {% set w_fin = w_connected and (states('sensor.washing_machine_program_finished') | lower in ['present', 'true', 'on'] or w_op == 'finished') %}
+        {% set d_fin = d_connected and (states('sensor.dryer_program_finished') | lower in ['present', 'true', 'on'] or states('sensor.dryer_drying_process_finished') | lower in ['present', 'true', 'on'] or d_op == 'finished') %}
         {{ w_fin or d_fin }}
   action:
     - variables:
